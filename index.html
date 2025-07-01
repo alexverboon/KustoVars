@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>KustoVars</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🟦</text></svg>">
   <style>
     :root {
       --bg-light: #f4f4f4;
@@ -25,10 +26,7 @@
       color: var(--text-dark);
     }
 
-    h1 {
-      margin-bottom: 0;
-    }
-
+    h1 { margin-bottom: 0; }
     .subtitle {
       font-size: 0.95rem;
       color: gray;
@@ -57,6 +55,7 @@
 
     button {
       margin-top: 1rem;
+      margin-right: 0.5rem;
       padding: 0.5rem 1rem;
       background-color: var(--accent);
       border: none;
@@ -69,6 +68,26 @@
       font-weight: bold;
       display: block;
       margin-top: 1rem;
+    }
+
+    .top-bar {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .top-bar a svg { fill: currentColor; }
+    .theme-toggle {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      color: inherit;
+      display: flex;
+      align-items: center;
     }
 
     .code-container {
@@ -99,17 +118,6 @@
     .kql-function { color: #267f99; }
     .kql-string { color: #a31515; }
 
-    .theme-toggle {
-      position: absolute;
-      top: 1rem;
-      right: 3rem;
-      cursor: pointer;
-      background: none;
-      border: none;
-      font-size: 1rem;
-      color: inherit;
-    }
-
     .copy-wrapper {
       position: absolute;
       top: 0.5rem;
@@ -132,13 +140,8 @@
       color: #fff;
     }
 
-    .copy-wrapper:hover {
-      background-color: #ccc;
-    }
-
-    body.dark .copy-wrapper:hover {
-      background-color: #555;
-    }
+    .copy-wrapper:hover { background-color: #ccc; }
+    body.dark .copy-wrapper:hover { background-color: #555; }
 
     .copy-wrapper svg {
       width: 14px;
@@ -161,11 +164,35 @@
     body.dark .count-display {
       color: #bbb;
     }
+
+    #input {
+      min-height: 140px;
+    }
+
+    #input.dragover {
+      border: 2px dashed var(--accent);
+    }
   </style>
 </head>
 <body>
 
-  <button class="theme-toggle" onclick="toggleTheme()">🌙 Toggle Theme</button>
+  <div class="top-bar">
+    <a href="https://github.com/alexverboon/KustoVars" target="_blank" title="GitHub Repository">
+      <svg xmlns="http://www.w3.org/2000/svg" height="20" width="20" viewBox="0 0 16 16">
+        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 
+          0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52
+          -.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78
+          -.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.01.08-2.11 0 0 .67-.21
+          2.2.82a7.7 7.7 0 0 1 2.01-.27c.68 0 1.36.09 2.01.27 1.53-1.04 2.2-.82
+          2.2-.82.44 1.1.16 1.91.08 2.11.51.56.82 1.27.82 2.15 0 3.07-1.87 
+          3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 
+          8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+      </svg>
+    </a>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+      <span id="theme-icon">🌙</span>
+    </button>
+  </div>
 
   <h1>KustoVars</h1>
   <p class="subtitle">KQL variable generator</p>
@@ -173,9 +200,11 @@
   <label for="varName">Variable name (e.g. <code>MyValues</code>):</label>
   <input type="text" id="varName" value="MyValues">
 
-  <label for="input">Paste your string values below (one per line):</label>
-<textarea id="input" rows="10" placeholder="e.g.&#10;Amsterdam&#10;Zurich&#10;Paris&#10;Madrid&#10;Rome"></textarea>
+  <label for="input">Paste values (or drop CSV file):</label>
+  <textarea id="input" placeholder="e.g.&#10;Amsterdam&#10;Zurich&#10;Paris&#10;Madrid&#10;Rome"></textarea>
+
   <button onclick="generateKQL()">Generate KQL</button>
+  <button onclick="downloadKQL()">Download .kql</button>
   <div class="count-display" id="countDisplay"></div>
 
   <h3>Output:</h3>
@@ -191,6 +220,18 @@
   <div id="copyStatus" class="copy-success"></div>
 
   <script>
+    function setThemeIcon() {
+      const icon = document.getElementById("theme-icon");
+      icon.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("dark");
+      document.body.classList.toggle("light");
+      localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+      setThemeIcon();
+    }
+
     function generateKQL() {
       const varName = document.getElementById('varName').value.trim() || "MyValues";
       const input = document.getElementById('input').value;
@@ -211,10 +252,14 @@
       document.getElementById('countDisplay').textContent = `Total values: ${values.length}`;
     }
 
-    function toggleTheme() {
-      document.body.classList.toggle("dark");
-      document.body.classList.toggle("light");
-      localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+    function downloadKQL() {
+      const varName = document.getElementById('varName').value.trim() || "MyValues";
+      const rawKql = document.getElementById('highlightedOutput').getAttribute('data-raw');
+      const blob = new Blob([rawKql], { type: 'text/plain' });
+      const link = document.createElement("a");
+      link.download = `${varName}.kql`;
+      link.href = URL.createObjectURL(blob);
+      link.click();
     }
 
     function copyOutput() {
@@ -226,10 +271,33 @@
       });
     }
 
-    (function () {
+    // CSV Drag & Drop
+    const inputArea = document.getElementById("input");
+    inputArea.addEventListener("dragover", e => {
+      e.preventDefault();
+      inputArea.classList.add("dragover");
+    });
+    inputArea.addEventListener("dragleave", () => inputArea.classList.remove("dragover"));
+    inputArea.addEventListener("drop", e => {
+      e.preventDefault();
+      inputArea.classList.remove("dragover");
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith(".csv")) {
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          const lines = evt.target.result.split('\n').map(line => line.split(',')[0].trim());
+          inputArea.value = lines.filter(l => l).join('\n');
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // Init
+    document.addEventListener("DOMContentLoaded", () => {
       const theme = localStorage.getItem("theme") || "light";
       document.body.classList.add(theme);
-    })();
+      setThemeIcon();
+    });
   </script>
 
 </body>

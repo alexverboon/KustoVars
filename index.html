@@ -54,14 +54,17 @@
     }
 
     button {
-      margin-top: 1rem;
-      margin-right: 0.5rem;
       padding: 0.5rem 1rem;
       background-color: var(--accent);
       border: none;
       color: white;
       cursor: pointer;
       border-radius: 4px;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: default;
     }
 
     label {
@@ -172,6 +175,16 @@
     #input.dragover {
       border: 2px dashed var(--accent);
     }
+
+    .btn-group {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    #downloadBtn {
+      margin-top: 1rem;
+    }
   </style>
 </head>
 <body>
@@ -197,14 +210,17 @@
   <h1>KustoVars</h1>
   <p class="subtitle">KQL variable generator</p>
 
-  <label for="varName">Variable name (e.g. <code>MyValues</code>):</label>
+  <label for="varName">Variable name:</label>
   <input type="text" id="varName" value="MyValues">
 
   <label for="input">Paste values (or drop CSV file):</label>
   <textarea id="input" placeholder="e.g.&#10;Amsterdam&#10;Zurich&#10;Paris&#10;Madrid&#10;Rome"></textarea>
 
-  <button onclick="generateKQL()">Generate KQL</button>
-  <button onclick="downloadKQL()">Download .kql</button>
+  <div class="btn-group">
+    <button onclick="generateKQL()">Generate KQL</button>
+    <button onclick="resetForm()">Reset</button>
+  </div>
+
   <div class="count-display" id="countDisplay"></div>
 
   <h3>Output:</h3>
@@ -217,12 +233,14 @@
       <span>Copy</span>
     </div>
   </div>
+
+  <button id="downloadBtn" onclick="downloadKQL()" disabled>Download .kql</button>
   <div id="copyStatus" class="copy-success"></div>
 
   <script>
     function setThemeIcon() {
-      const icon = document.getElementById("theme-icon");
-      icon.textContent = document.body.classList.contains("dark") ? "☀️" : "🌙";
+      document.getElementById("theme-icon").textContent =
+        document.body.classList.contains("dark") ? "☀️" : "🌙";
     }
 
     function toggleTheme() {
@@ -235,64 +253,72 @@
     function generateKQL() {
       const varName = document.getElementById('varName').value.trim() || "MyValues";
       const input = document.getElementById('input').value;
-      const values = input
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
+      const values = input.split('\n').map(l => l.trim()).filter(Boolean);
 
-      const rawArray = values.map(v => `"${v.replace(/"/g, '\\"')}"`).join(',');
-      const rawKql = `let ${varName} = dynamic([${rawArray}]);`;
+      const raw = values.map(v => `"${v.replace(/"/g, '\\"')}"`).join(',');
+      const rawKql = `let ${varName} = dynamic([${raw}]);`;
+      const html = `<span class="kql-keyword">let</span> <span class="kql-function">${varName}</span> = <span class="kql-function">dynamic</span>([${values.map(v => `<span class="kql-string">"${v.replace(/"/g, '\\"')}"</span>`).join(',')}]);`;
 
-      const highlighted = `
-<span class="kql-keyword">let</span> <span class="kql-function">${varName}</span> = <span class="kql-function">dynamic</span>([${values.map(v => `<span class="kql-string">"${v.replace(/"/g, '\\"')}"</span>`).join(',')}]);`;
-
-      document.getElementById('highlightedOutput').innerHTML = highlighted.trim();
+      document.getElementById('highlightedOutput').innerHTML = html;
       document.getElementById('highlightedOutput').setAttribute('data-raw', rawKql);
-      document.getElementById('copyStatus').textContent = '';
       document.getElementById('countDisplay').textContent = `Total values: ${values.length}`;
+      document.getElementById('copyStatus').textContent = '';
+
+      const dl = document.getElementById('downloadBtn');
+      dl.disabled = false;
     }
 
     function downloadKQL() {
       const varName = document.getElementById('varName').value.trim() || "MyValues";
-      const rawKql = document.getElementById('highlightedOutput').getAttribute('data-raw');
-      const blob = new Blob([rawKql], { type: 'text/plain' });
+      const content = document.getElementById('highlightedOutput').getAttribute('data-raw');
+      const blob = new Blob([content], { type: "text/plain" });
       const link = document.createElement("a");
-      link.download = `${varName}.kql`;
       link.href = URL.createObjectURL(blob);
+      link.download = `${varName}.kql`;
       link.click();
     }
 
+    function resetForm() {
+      document.getElementById('varName').value = "MyValues";
+      document.getElementById('input').value = "";
+      document.getElementById('highlightedOutput').innerHTML = "";
+      document.getElementById('countDisplay').textContent = "";
+      document.getElementById('copyStatus').textContent = "";
+      document.getElementById('downloadBtn').disabled = true;
+    }
+
     function copyOutput() {
-      const rawText = document.getElementById("highlightedOutput").getAttribute('data-raw');
-      navigator.clipboard.writeText(rawText).then(() => {
+      const raw = document.getElementById("highlightedOutput").getAttribute("data-raw");
+      navigator.clipboard.writeText(raw).then(() => {
         const status = document.getElementById("copyStatus");
         status.textContent = "Copied to clipboard!";
         setTimeout(() => status.textContent = '', 2000);
       });
     }
 
-    // CSV Drag & Drop
-    const inputArea = document.getElementById("input");
-    inputArea.addEventListener("dragover", e => {
+    document.getElementById("input").addEventListener("dragover", e => {
       e.preventDefault();
-      inputArea.classList.add("dragover");
+      e.target.classList.add("dragover");
     });
-    inputArea.addEventListener("dragleave", () => inputArea.classList.remove("dragover"));
-    inputArea.addEventListener("drop", e => {
+
+    document.getElementById("input").addEventListener("dragleave", e => {
+      e.target.classList.remove("dragover");
+    });
+
+    document.getElementById("input").addEventListener("drop", e => {
       e.preventDefault();
-      inputArea.classList.remove("dragover");
+      e.target.classList.remove("dragover");
       const file = e.dataTransfer.files[0];
       if (file && file.name.endsWith(".csv")) {
         const reader = new FileReader();
-        reader.onload = function (evt) {
-          const lines = evt.target.result.split('\n').map(line => line.split(',')[0].trim());
-          inputArea.value = lines.filter(l => l).join('\n');
+        reader.onload = evt => {
+          const lines = evt.target.result.split("\n").map(l => l.split(",")[0].trim()).filter(Boolean);
+          document.getElementById("input").value = lines.join("\n");
         };
         reader.readAsText(file);
       }
     });
 
-    // Init
     document.addEventListener("DOMContentLoaded", () => {
       const theme = localStorage.getItem("theme") || "light";
       document.body.classList.add(theme);

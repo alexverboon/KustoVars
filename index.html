@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>KustoVars</title>
+  <style>
+    :root {
+      --bg-light: #f4f4f4;
+      --text-light: #000;
+      --bg-dark: #1e1e1e;
+      --text-dark: #ddd;
+      --accent: #4caf50;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body.dark {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    h1 {
+      margin-bottom: 0;
+    }
+
+    .subtitle {
+      font-size: 0.95rem;
+      color: gray;
+      margin-top: 0;
+      margin-bottom: 1.5rem;
+    }
+
+    textarea, input {
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 1rem;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+      font-size: 0.95rem;
+      background-color: #fff;
+      color: #000;
+    }
+
+    body.dark textarea, body.dark input {
+      background-color: #2e2e2e;
+      color: #ddd;
+      border: 1px solid #555;
+    }
+
+    button {
+      margin-top: 1rem;
+      padding: 0.5rem 1rem;
+      background-color: var(--accent);
+      border: none;
+      color: white;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    label {
+      font-weight: bold;
+      display: block;
+      margin-top: 1rem;
+    }
+
+    .code-container {
+      position: relative;
+      margin-top: 1rem;
+    }
+
+    .code-output {
+      font-family: Consolas, monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      padding: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #fff;
+      color: #000;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    body.dark .code-output {
+      background-color: #2e2e2e;
+      border: 1px solid #555;
+      color: #ddd;
+    }
+
+    .kql-keyword { color: #0000ff; font-weight: bold; }
+    .kql-function { color: #267f99; }
+    .kql-string { color: #a31515; }
+
+    .theme-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 3rem;
+      cursor: pointer;
+      background: none;
+      border: none;
+      font-size: 1rem;
+      color: inherit;
+    }
+
+    .copy-wrapper {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      display: flex;
+      align-items: center;
+      background-color: #e0e0e0;
+      border: 1px solid #aaa;
+      border-radius: 4px;
+      padding: 2px 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      gap: 4px;
+      color: #000;
+    }
+
+    body.dark .copy-wrapper {
+      background-color: #444;
+      border: 1px solid #666;
+      color: #fff;
+    }
+
+    .copy-wrapper:hover {
+      background-color: #ccc;
+    }
+
+    body.dark .copy-wrapper:hover {
+      background-color: #555;
+    }
+
+    .copy-wrapper svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    .copy-success {
+      color: var(--accent);
+      font-size: 0.9rem;
+      margin-top: 0.5rem;
+    }
+
+    .count-display {
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    body.dark .count-display {
+      color: #bbb;
+    }
+  </style>
+</head>
+<body>
+
+  <button class="theme-toggle" onclick="toggleTheme()">🌙 Toggle Theme</button>
+
+  <h1>KustoVars</h1>
+  <p class="subtitle">KQL variable generator</p>
+
+  <label for="varName">Variable name (e.g. <code>MyValues</code>):</label>
+  <input type="text" id="varName" value="MyValues">
+
+  <label for="input">Paste your string values below (one per line):</label>
+<textarea id="input" rows="10" placeholder="e.g.&#10;Amsterdam&#10;Zurich&#10;Paris&#10;Madrid&#10;Rome"></textarea>
+  <button onclick="generateKQL()">Generate KQL</button>
+  <div class="count-display" id="countDisplay"></div>
+
+  <h3>Output:</h3>
+  <div class="code-container">
+    <div id="highlightedOutput" class="code-output"></div>
+    <div class="copy-wrapper" onclick="copyOutput()" title="Copy to clipboard">
+      <svg viewBox="0 0 24 24">
+        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 18H8V7h11v16z"/>
+      </svg>
+      <span>Copy</span>
+    </div>
+  </div>
+  <div id="copyStatus" class="copy-success"></div>
+
+  <script>
+    function generateKQL() {
+      const varName = document.getElementById('varName').value.trim() || "MyValues";
+      const input = document.getElementById('input').value;
+      const values = input
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      const rawArray = values.map(v => `"${v.replace(/"/g, '\\"')}"`).join(',');
+      const rawKql = `let ${varName} = dynamic([${rawArray}]);`;
+
+      const highlighted = `
+<span class="kql-keyword">let</span> <span class="kql-function">${varName}</span> = <span class="kql-function">dynamic</span>([${values.map(v => `<span class="kql-string">"${v.replace(/"/g, '\\"')}"</span>`).join(',')}]);`;
+
+      document.getElementById('highlightedOutput').innerHTML = highlighted.trim();
+      document.getElementById('highlightedOutput').setAttribute('data-raw', rawKql);
+      document.getElementById('copyStatus').textContent = '';
+      document.getElementById('countDisplay').textContent = `Total values: ${values.length}`;
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle("dark");
+      document.body.classList.toggle("light");
+      localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+    }
+
+    function copyOutput() {
+      const rawText = document.getElementById("highlightedOutput").getAttribute('data-raw');
+      navigator.clipboard.writeText(rawText).then(() => {
+        const status = document.getElementById("copyStatus");
+        status.textContent = "Copied to clipboard!";
+        setTimeout(() => status.textContent = '', 2000);
+      });
+    }
+
+    (function () {
+      const theme = localStorage.getItem("theme") || "light";
+      document.body.classList.add(theme);
+    })();
+  </script>
+
+</body>
+</html>
